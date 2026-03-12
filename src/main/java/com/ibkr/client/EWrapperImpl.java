@@ -109,6 +109,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -117,25 +118,13 @@ import lombok.extern.slf4j.Slf4j;
  * <p>TWS API uses event-driven architecture where responses to requests are delivered through
  * methods defined in {@link EWrapper}.
  *
- * <p>The class also stores the next valid {@code requestId} received from TWS API via
- * {@link #nextValidId(int)}. This ID is used when sending requests to ensure each request is
- * unique
- *
  * <p>Note: Most callback methods are intentionally left unimplemented as they are not needed.
  */
 @Slf4j
+@RequiredArgsConstructor
 public class EWrapperImpl implements EWrapper {
 
-  private int requestId;
-
-  /**
-   * Returns the latest unique request ID provided by TWS API.
-   *
-   * @return request ID
-   */
-  public int requestId() {
-    return this.requestId;
-  }
+  private final IBClient client;
 
   @Override
   public void tickPrice(int i, int i1, double v, TickAttrib tickAttrib) {
@@ -208,7 +197,7 @@ public class EWrapperImpl implements EWrapper {
 
   @Override
   public void nextValidId(int requestId) {
-    this.requestId = requestId;
+
   }
 
   @Override
@@ -254,7 +243,7 @@ public class EWrapperImpl implements EWrapper {
 
   @Override
   public void managedAccounts(String accounts) {
-    log.info("Accounts: {}", accounts);
+
   }
 
   @Override
@@ -755,9 +744,15 @@ public class EWrapperImpl implements EWrapper {
 
   }
 
+  /**
+   * Callback invoked after initial connection to TWS API is completed with the accounts currently
+   * in session.
+   *
+   * @param managedAccounts accounts in session
+   */
   @Override
   public void managedAccountsProtoBuf(ManagedAccounts managedAccounts) {
-
+    log.info("Accounts: {}", managedAccounts);
   }
 
   @Override
@@ -997,9 +992,17 @@ public class EWrapperImpl implements EWrapper {
 
   }
 
+  /**
+   * Sets the next valid request ID and signals the {@link IBClient} that the initial connection and
+   * handshake have been fully initialised and TWS API is ready to process requests. Any requests
+   * sent prior to handshake completion may be dropped by TWS API.
+   *
+   * @param nextValidId next valid request ID
+   */
   @Override
   public void nextValidIdProtoBuf(NextValidId nextValidId) {
-
+    client.setNextValidId(nextValidId.getOrderId());
+    client.connectionReady();
   }
 
   @Override

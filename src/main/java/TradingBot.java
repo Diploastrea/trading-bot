@@ -1,7 +1,4 @@
-import com.ib.client.EClientSocket;
-import com.ib.client.EJavaSignal;
 import com.ib.controller.AccountSummaryTag;
-import com.ibkr.client.EWrapperImpl;
 import com.ibkr.client.IBClient;
 import lombok.extern.slf4j.Slf4j;
 
@@ -11,14 +8,12 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class TradingBot {
 
-  void main() {
-    EWrapperImpl wrapper = new EWrapperImpl();
-    EJavaSignal signal = new EJavaSignal();
-    EClientSocket client = new EClientSocket(wrapper, signal);
-    IBClient ib = new IBClient(signal, client);
+  void main() throws Exception {
+    IBClient ib = new IBClient();
     ib.connect();
 
+    log.info("calling acc summary");
     ib.client()
-        .reqAccountSummary(wrapper.requestId(), "All", AccountSummaryTag.NetLiquidation.name());
+        .reqAccountSummary(ib.getNextValidId(), "All", AccountSummaryTag.NetLiquidation.name());
   }
 }
