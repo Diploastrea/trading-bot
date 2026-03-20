@@ -105,10 +105,14 @@ import com.ib.client.protobuf.VerifyCompletedProto.VerifyCompleted;
 import com.ib.client.protobuf.VerifyMessageApiProto.VerifyMessageApi;
 import com.ib.client.protobuf.WshEventDataProto.WshEventData;
 import com.ib.client.protobuf.WshMetaDataProto.WshMetaData;
+import com.ibkr.client.IBClient;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -116,7 +120,11 @@ import lombok.extern.slf4j.Slf4j;
  * This class is a primary callback handler for all messages received from TWS API.
  *
  * <p>TWS API uses event-driven architecture where responses to requests are delivered through
- * methods defined in {@link EWrapper}.
+ * methods defined in {@link EWrapper}. These methods are invoked by the {@link EReader} thread and
+ * blocking operations should be offloaded to a separate executor to avoid stalling the socket.
+ *
+ * <p>This class also stores {@code nextRequestId} given by TWS API, which is used to ensure each
+ * request to the API is unique.
  *
  * <p>Note: Most callback methods are intentionally left unimplemented as they are not needed.
  */
@@ -124,7 +132,14 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class EWrapperImpl implements EWrapper {
 
+  private final AtomicInteger nextRequestId = new AtomicInteger();
+  private final ExecutorService reconnectExecutor = Executors.newSingleThreadExecutor(
+      Thread.ofPlatform().name("main").factory());
   private final IBClient client;
+
+  public int nextRequestId() {
+    return nextRequestId.getAndIncrement();
+  }
 
   @Override
   public void tickPrice(int i, int i1, double v, TickAttrib tickAttrib) {
@@ -384,9 +399,13 @@ public class EWrapperImpl implements EWrapper {
 
   }
 
+  /**
+   * Callback invoked when a connection fails for any reason.
+   */
   @Override
   public void connectionClosed() {
-
+    log.error("TWS API connection closed, attempting to reconnect...");
+    reconnectExecutor.execute(client::connect);
   }
 
   @Override
