@@ -7,8 +7,11 @@ import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+
 
 /**
  * Client wrapper responsible for managing the connection to TWS API.
@@ -18,21 +21,23 @@ import lombok.extern.slf4j.Slf4j;
  * by the API.
  */
 @Slf4j
+@Component
+@RequiredArgsConstructor
 public class IBClient {
 
   private static final AtomicBoolean readerThreadRunning = new AtomicBoolean(false);
   private final EJavaSignal signal;
   private final EClientSocket client;
-  private final AtomicBoolean readerThreadRunning = new AtomicBoolean(false);
   private volatile CountDownLatch latch = new CountDownLatch(1);
 
-  @Getter
-  private int nextValidId;
+  @Value("${ibkr.host}")
+  private String host;
 
-  public IBClient() {
-    signal = new EJavaSignal();
-    client = new EClientSocket(new EWrapperImpl(this), signal);
-  }
+  @Value("${ibkr.port}")
+  private int port;
+
+  @Value("${ibkr.client-id}")
+  private int clientId;
 
   /**
    * Returns an instance of {@link EClientSocket} used to send TWS API requests.
@@ -44,19 +49,9 @@ public class IBClient {
   }
 
   /**
-   * Sets the next valid request ID, which ensures that each request is unique as required by TWS
-   * API.
-   *
-   * @param nextValidId next valid request ID
-   */
-  protected void setNextValidId(int nextValidId) {
-    this.nextValidId = nextValidId;
-  }
-
-  /**
    * This method is invoked to signal TWS API is ready to process requests.
    */
-  protected void connectionReady() {
+  public void connectionReady() {
     latch.countDown();
   }
 
@@ -67,8 +62,6 @@ public class IBClient {
    * simple mechanism with {@link CountDownLatch} is used to block the current thread until the
    * handshake is complete and reader thread signals TWS API is ready. If the connection times out,
    * connection retry will be attempted.
-   *
-   * @throws InterruptedException if the current thread is interrupted while waiting
    */
   @SuppressWarnings("BusyWait")
   public void connect() {
@@ -109,7 +102,6 @@ public class IBClient {
 
     EReader reader = new EReader(client, signal);
     reader.start();
-    readerThreadRunning.set(true);
     Thread.ofVirtual().name("reader").start(() -> {
       try {
         while (client.isConnected()) {
@@ -123,22 +115,6 @@ public class IBClient {
         readerThreadRunning.set(false);
       }
     });
-  }
-
-  /**
-   * Returns an instance of {@link EClientSocket} used to send TWS API requests.
-   *
-   * @return {@link EClientSocket} object
-   */
-  public EClientSocket client() {
-    return client;
-  }
-
-  /**
-   * This method is invoked to signal TWS API is ready to process requests.
-   */
-  public void connectionReady() {
-    latch.countDown();
   }
 
   /**

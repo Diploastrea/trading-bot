@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: trading-bot
+  threads:
+    virtual:
+      enabled: true
+  output:
+    ansi:
+      enabled: ALWAYS
+
+logging:
+  pattern:
+    dateformat: yyyy-MM-dd HH:mm:ss.SSS
+    level: "%5p [%t]"
+  level:
+    com.ibkr: info
+
+ibkr:
+  host: 127.0.0.1
+  port: 7497
+  client-id: 0

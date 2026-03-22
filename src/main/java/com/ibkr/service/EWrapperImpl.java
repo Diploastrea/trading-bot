@@ -1,4 +1,4 @@
-package com.ibkr.client;
+package com.ibkr.service;
 
 import com.ib.client.Bar;
 import com.ib.client.CommissionAndFeesReport;
@@ -115,6 +115,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
 
 /**
  * This class is a primary callback handler for all messages received from TWS API.
@@ -129,6 +130,7 @@ import lombok.extern.slf4j.Slf4j;
  * <p>Note: Most callback methods are intentionally left unimplemented as they are not needed.
  */
 @Slf4j
+@Service
 @RequiredArgsConstructor
 public class EWrapperImpl implements EWrapper {
 
@@ -1020,7 +1022,7 @@ public class EWrapperImpl implements EWrapper {
    */
   @Override
   public void nextValidIdProtoBuf(NextValidId nextValidId) {
-    client.setNextValidId(nextValidId.getOrderId());
+    nextRequestId.set(nextValidId.getOrderId());
     client.connectionReady();
   }
 
