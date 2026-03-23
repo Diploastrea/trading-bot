@@ -1,8 +1,6 @@
 package com.ibkr;
 
-import com.ib.client.Types.SecType;
 import com.ibkr.client.IBClient;
-import com.ibkr.service.MarketDataService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
@@ -20,7 +18,6 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class TradingBotApplication implements ApplicationRunner {
 
   private final IBClient ib;
-  private final MarketDataService marketDataService;
 
   static void main(String[] args) {
     SpringApplication.run(TradingBotApplication.class, args);
@@ -29,6 +26,5 @@ public class TradingBotApplication implements ApplicationRunner {
   @Override
   public void run(@NonNull ApplicationArguments args) {
     ib.connect();
-    marketDataService.requestLiveMarketData("SPY", SecType.STK, "ARCA", "USD", 756733);
   }
 }

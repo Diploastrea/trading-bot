@@ -14,7 +14,6 @@ import org.springframework.stereotype.Service;
 public class MarketDataService {
 
   private final IBClient ib;
-  private final EWrapperImpl wrapper;
 
   /**
    * Requests live market data stream for a specific contract.
@@ -34,6 +33,6 @@ public class MarketDataService {
     contract.currency(currency);
     contract.conid(contractId);
 
-    ib.client().reqMktData(wrapper.nextRequestId(), contract, "", false, false, null);
+    ib.client().reqRealTimeBars(ib.getNextRequestId(), contract, 5, "TRADES", true, null);
   }
 }

@@ -5,8 +5,10 @@ import com.ib.client.EJavaSignal;
 import com.ib.client.EReader;
 import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,6 +21,9 @@ import org.springframework.stereotype.Component;
  * <p>This class encapsulates the setup of the underlying {@link EClientSocket}, including
  * initialisation and managing the lifecycle of the {@link EReader} message processing loop required
  * by the API.
+ *
+ * <p>This class also stores {@code nextRequestId} given by TWS API, which is used to ensure each
+ * request to the API is unique.
  */
 @Slf4j
 @Component
@@ -26,8 +31,10 @@ import org.springframework.stereotype.Component;
 public class IBClient {
 
   private static final AtomicBoolean readerThreadRunning = new AtomicBoolean(false);
+  private final AtomicInteger nextRequestId = new AtomicInteger();
   private final EJavaSignal signal;
   private final EClientSocket client;
+  private final ExecutorService executor;
   private volatile CountDownLatch latch = new CountDownLatch(1);
 
   @Value("${ibkr.host}")
@@ -49,6 +56,24 @@ public class IBClient {
   }
 
   /**
+   * Returns and increments the next valid request ID.
+   *
+   * @return next request ID
+   */
+  public int getNextRequestId() {
+    return nextRequestId.getAndIncrement();
+  }
+
+  /**
+   * Sets the next valid request ID returned by TWS API.
+   *
+   * @param nextRequestId next request ID
+   */
+  public void setNextRequestId(int nextRequestId) {
+    this.nextRequestId.set(nextRequestId);
+  }
+
+  /**
    * This method is invoked to signal TWS API is ready to process requests.
    */
   public void connectionReady() {
@@ -60,8 +85,9 @@ public class IBClient {
    *
    * <p>To ensure the initial connection is fully initialised before the client sends requests, a
    * simple mechanism with {@link CountDownLatch} is used to block the current thread until the
-   * handshake is complete and reader thread signals TWS API is ready. If the connection times out,
-   * connection retry will be attempted.
+   * handshake is complete and reader thread signals TWS API is ready. Any requests sent prior to
+   * handshake completion may be dropped by TWS API. If the connection times out, connection retry
+   * will be attempted.
    */
   @SuppressWarnings("BusyWait")
   public void connect() {
@@ -102,7 +128,7 @@ public class IBClient {
 
     EReader reader = new EReader(client, signal);
     reader.start();
-    Thread.ofVirtual().name("reader").start(() -> {
+    executor.submit(() -> {
       try {
         while (client.isConnected()) {
           signal.waitForSignal();

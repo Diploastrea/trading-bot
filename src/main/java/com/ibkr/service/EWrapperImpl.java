@@ -113,8 +113,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicInteger;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -136,9 +134,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class EWrapperImpl implements EWrapper {
 
-  private final AtomicInteger nextRequestId = new AtomicInteger();
-  private final ExecutorService reconnectExecutor = Executors.newSingleThreadExecutor(
-      Thread.ofPlatform().name("main").factory());
+  private final ExecutorService executor;
   private final IBClient client;
 
   /**
@@ -160,7 +156,8 @@ public class EWrapperImpl implements EWrapper {
    */
   @Override
   public void tickPrice(int requestId, int tickType, double price, TickAttrib attributes) {
-    log.info("Tick Price: {}", EWrapperMsgGenerator.tickPrice(requestId, tickType, price, attributes));
+    log.info("Tick Price: {}",
+        EWrapperMsgGenerator.tickPrice(requestId, tickType, price, attributes));
   }
 
   @Override
@@ -422,7 +419,7 @@ public class EWrapperImpl implements EWrapper {
   @Override
   public void connectionClosed() {
     log.error("TWS API connection closed, attempting to reconnect...");
-    reconnectExecutor.execute(client::connect);
+    executor.execute(client::connect);
   }
 
   @Override
@@ -856,9 +853,14 @@ public class EWrapperImpl implements EWrapper {
 
   }
 
+  /**
+   * Callback handling time bar ticks.
+   *
+   * @param realTimeBarTick time bar tick object
+   */
   @Override
   public void realTimeBarTickProtoBuf(RealTimeBarTick realTimeBarTick) {
-
+    log.debug("realTimeBar: {}", realTimeBarTick);
   }
 
   @Override
@@ -1030,14 +1032,13 @@ public class EWrapperImpl implements EWrapper {
 
   /**
    * Sets the next valid request ID and signals the {@link IBClient} that the initial connection and
-   * handshake have been fully initialised and TWS API is ready to process requests. Any requests
-   * sent prior to handshake completion may be dropped by TWS API.
+   * handshake have been fully initialised and TWS API is ready to process requests.
    *
    * @param nextValidId next valid request ID
    */
   @Override
   public void nextValidIdProtoBuf(NextValidId nextValidId) {
-    nextRequestId.set(nextValidId.getOrderId());
+    client.setNextRequestId(nextValidId.getOrderId());
     client.connectionReady();
   }
 
