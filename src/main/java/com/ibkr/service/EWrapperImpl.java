@@ -8,7 +8,9 @@ import com.ib.client.ContractDetails;
 import com.ib.client.Decimal;
 import com.ib.client.DeltaNeutralContract;
 import com.ib.client.DepthMktDataDescription;
+import com.ib.client.EReader;
 import com.ib.client.EWrapper;
+import com.ib.client.EWrapperMsgGenerator;
 import com.ib.client.Execution;
 import com.ib.client.FamilyCode;
 import com.ib.client.HistogramEntry;
@@ -139,13 +141,26 @@ public class EWrapperImpl implements EWrapper {
       Thread.ofPlatform().name("main").factory());
   private final IBClient client;
 
+  /**
+   * Returns and increments the next valid request ID.
+   *
+   * @return next request ID
+   */
   public int nextRequestId() {
     return nextRequestId.getAndIncrement();
   }
 
+  /**
+   * Callback handling all price related ticks.
+   *
+   * @param requestId  request ID
+   * @param tickType   type of price being received
+   * @param price      value
+   * @param attributes price attributes
+   */
   @Override
-  public void tickPrice(int i, int i1, double v, TickAttrib tickAttrib) {
-
+  public void tickPrice(int requestId, int tickType, double price, TickAttrib attributes) {
+    log.info("Tick Price: {}", EWrapperMsgGenerator.tickPrice(requestId, tickType, price, attributes));
   }
 
   @Override
@@ -649,7 +664,7 @@ public class EWrapperImpl implements EWrapper {
   @Override
   public void errorProtoBuf(ErrorMessage errorMessage) {
     if (errorMessage.getId() == -1) {
-      log.info("Error protobuf: {}", errorMessage);
+      log.debug("Error protobuf: {}", errorMessage);
     } else {
       log.error("Error protobuf: {}", errorMessage);
     }
