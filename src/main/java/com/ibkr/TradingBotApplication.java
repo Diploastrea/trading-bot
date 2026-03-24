@@ -24,7 +24,8 @@ public class TradingBotApplication implements ApplicationRunner {
   }
 
   @Override
-  public void run(@NonNull ApplicationArguments args) {
+  public void run(@NonNull ApplicationArguments args) throws Exception {
     ib.connect();
+    Thread.currentThread().join();
   }
 }

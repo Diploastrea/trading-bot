@@ -3,6 +3,7 @@ package com.ibkr.client;
 import com.ib.client.EClientSocket;
 import com.ib.client.EJavaSignal;
 import com.ib.client.EReader;
+import com.ibkr.domain.MarketDataSubscriptionEvent;
 import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -12,6 +13,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 
@@ -30,11 +32,13 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class IBClient {
 
+  private static final AtomicBoolean isReconnecting = new AtomicBoolean(false);
   private static final AtomicBoolean readerThreadRunning = new AtomicBoolean(false);
   private final AtomicInteger nextRequestId = new AtomicInteger();
   private final EJavaSignal signal;
   private final EClientSocket client;
   private final ExecutorService executor;
+  private final ApplicationEventPublisher publisher;
   private volatile CountDownLatch latch = new CountDownLatch(1);
 
   @Value("${ibkr.host}")
@@ -81,6 +85,13 @@ public class IBClient {
   }
 
   /**
+   * Starts the connection process utilising virtual thread.
+   */
+  public void connect() {
+    executor.execute(this::connectionLoop);
+  }
+
+  /**
    * Establishes connection to TWS API and starts the API message processing loop.
    *
    * <p>To ensure the initial connection is fully initialised before the client sends requests, a
@@ -90,27 +101,33 @@ public class IBClient {
    * will be attempted.
    */
   @SuppressWarnings("BusyWait")
-  public void connect() {
-    while (true) {
-      log.info("Connecting to TWS API...");
-      client.eDisconnect();
-      resetLatch();
+  public void connectionLoop() {
+    if (!isReconnecting.compareAndSet(false, true)) {
+      return;
+    }
 
-      client.eConnect(host, port, clientId);
-      startReaderThread();
-      try {
+    try {
+      while (true) {
+        log.info("Connecting to TWS API...");
+        resetConnection();
+        client.eConnect(host, port, clientId);
+        startReaderThread();
+
         boolean connectionComplete = latch.await(10, TimeUnit.SECONDS);
         if (connectionComplete) {
           log.info("TWS API connection fully initialised.");
+          publisher.publishEvent(new MarketDataSubscriptionEvent());
           return;
         }
 
         log.error("TWS API connection handshake timed out, attempting to reconnect...");
-        Thread.sleep(10000);
-      } catch (InterruptedException e) {
-        log.error(e.getMessage(), e);
-        Thread.currentThread().interrupt();
+        Thread.sleep(15000);
       }
+    } catch (InterruptedException e) {
+      log.error(e.getMessage(), e);
+      Thread.currentThread().interrupt();
+    } finally {
+      isReconnecting.set(false);
     }
   }
 
@@ -130,7 +147,7 @@ public class IBClient {
     reader.start();
     executor.submit(() -> {
       try {
-        while (client.isConnected()) {
+        while (readerThreadRunning.get() && client.isConnected()) {
           signal.waitForSignal();
           reader.processMsgs();
         }
@@ -144,9 +161,11 @@ public class IBClient {
   }
 
   /**
-   * Resets the {@link CountDownLatch} for a new TWS API connection attempt.
+   * Resets the connection state for a new connection attempt.
    */
-  private void resetLatch() {
+  private void resetConnection() {
+    client.eDisconnect();
+    signal.issueSignal();
     latch = new CountDownLatch(1);
   }
 }

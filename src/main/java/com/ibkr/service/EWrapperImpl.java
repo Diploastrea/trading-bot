@@ -108,6 +108,7 @@ import com.ib.client.protobuf.VerifyMessageApiProto.VerifyMessageApi;
 import com.ib.client.protobuf.WshEventDataProto.WshEventData;
 import com.ib.client.protobuf.WshMetaDataProto.WshMetaData;
 import com.ibkr.client.IBClient;
+import com.ibkr.domain.BarTickEvent;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -115,6 +116,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 /**
@@ -124,9 +126,6 @@ import org.springframework.stereotype.Service;
  * methods defined in {@link EWrapper}. These methods are invoked by the {@link EReader} thread and
  * blocking operations should be offloaded to a separate executor to avoid stalling the socket.
  *
- * <p>This class also stores {@code nextRequestId} given by TWS API, which is used to ensure each
- * request to the API is unique.
- *
  * <p>Note: Most callback methods are intentionally left unimplemented as they are not needed.
  */
 @Slf4j
@@ -134,17 +133,9 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class EWrapperImpl implements EWrapper {
 
-  private final ExecutorService executor;
   private final IBClient client;
-
-  /**
-   * Returns and increments the next valid request ID.
-   *
-   * @return next request ID
-   */
-  public int nextRequestId() {
-    return nextRequestId.getAndIncrement();
-  }
+  private final ApplicationEventPublisher publisher;
+  private final ExecutorService executor;
 
   /**
    * Callback handling all price related ticks.
@@ -861,6 +852,7 @@ public class EWrapperImpl implements EWrapper {
   @Override
   public void realTimeBarTickProtoBuf(RealTimeBarTick realTimeBarTick) {
     log.debug("realTimeBar: {}", realTimeBarTick);
+    publisher.publishEvent(new BarTickEvent(realTimeBarTick));
   }
 
   @Override

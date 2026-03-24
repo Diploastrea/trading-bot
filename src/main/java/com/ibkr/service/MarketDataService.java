@@ -1,9 +1,14 @@
 package com.ibkr.service;
 
 import com.ib.client.Contract;
-import com.ib.client.Types.SecType;
 import com.ibkr.client.IBClient;
+import com.ibkr.domain.MarketDataSubscriptionEvent;
+import com.ibkr.strategy.Strategy;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
 /**
@@ -14,25 +19,18 @@ import org.springframework.stereotype.Service;
 public class MarketDataService {
 
   private final IBClient ib;
+  private final List<Strategy> strategies;
 
   /**
-   * Requests live market data stream for a specific contract.
-   *
-   * @param symbol       ticker symbol
-   * @param securityType security type (e.g. stock, options)
-   * @param exchange     exchange
-   * @param currency     currency
-   * @param contractId   contract ID
+   * Processes market data subscription requests by aggregating unique contracts from all registered
+   * {@link Strategy} instances to prevent redundant API calls and potential pacing violations.
    */
-  public void requestLiveMarketData(String symbol, SecType securityType, String exchange,
-      String currency, int contractId) {
-    Contract contract = new Contract();
-    contract.symbol(symbol);
-    contract.secType(securityType);
-    contract.exchange(exchange);
-    contract.currency(currency);
-    contract.conid(contractId);
-
-    ib.client().reqRealTimeBars(ib.getNextRequestId(), contract, 5, "TRADES", true, null);
+  @EventListener(MarketDataSubscriptionEvent.class)
+  public void requestMarketData() {
+    Set<Contract> contracts = strategies.stream().map(Strategy::getContract)
+        .collect(Collectors.toSet());
+    contracts.forEach(contract -> ib.client()
+        .reqRealTimeBars(ib.getNextRequestId(), contract, 5, "TRADES", false, null)
+    );
   }
 }
