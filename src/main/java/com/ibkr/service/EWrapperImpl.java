@@ -10,7 +10,6 @@ import com.ib.client.DeltaNeutralContract;
 import com.ib.client.DepthMktDataDescription;
 import com.ib.client.EReader;
 import com.ib.client.EWrapper;
-import com.ib.client.EWrapperMsgGenerator;
 import com.ib.client.Execution;
 import com.ib.client.FamilyCode;
 import com.ib.client.HistogramEntry;
@@ -108,7 +107,8 @@ import com.ib.client.protobuf.VerifyMessageApiProto.VerifyMessageApi;
 import com.ib.client.protobuf.WshEventDataProto.WshEventData;
 import com.ib.client.protobuf.WshMetaDataProto.WshMetaData;
 import com.ibkr.client.IBClient;
-import com.ibkr.domain.BarTickEvent;
+import com.ibkr.events.BarTickEvent;
+import com.ibkr.events.TickPriceEvent;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -137,18 +137,9 @@ public class EWrapperImpl implements EWrapper {
   private final ApplicationEventPublisher publisher;
   private final ExecutorService executor;
 
-  /**
-   * Callback handling all price related ticks.
-   *
-   * @param requestId  request ID
-   * @param tickType   type of price being received
-   * @param price      value
-   * @param attributes price attributes
-   */
   @Override
   public void tickPrice(int requestId, int tickType, double price, TickAttrib attributes) {
-    log.info("Tick Price: {}",
-        EWrapperMsgGenerator.tickPrice(requestId, tickType, price, attributes));
+
   }
 
   @Override
@@ -698,9 +689,14 @@ public class EWrapperImpl implements EWrapper {
 
   }
 
+  /**
+   * Callback handling all price related ticks.
+   *
+   * @param tickPrice object containing price related data (e.g. bid price, ask price)
+   */
   @Override
   public void tickPriceProtoBuf(TickPrice tickPrice) {
-
+    publisher.publishEvent(new TickPriceEvent(tickPrice));
   }
 
   @Override

@@ -1,6 +1,7 @@
 package com.ibkr.strategy;
 
-import com.ibkr.domain.BarTickEvent;
+import com.ibkr.events.BarTickEvent;
+import com.ibkr.events.TickPriceEvent;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.springframework.context.event.EventListener;
@@ -30,7 +31,17 @@ public abstract class AbstractStrategy implements Strategy {
    * @param event published market data event
    */
   @EventListener
-  public void handleEvent(BarTickEvent event) {
+  private void handleBarTickEvent(BarTickEvent event) {
     executor.execute(() -> onBarTickEvent(event.realTimeBarTick()));
+  }
+
+  /**
+   * Dispatches incoming tick price to the strategy's executor.
+   *
+   * @param event published market data event
+   */
+  @EventListener
+  private void handleTickPriceEvent(TickPriceEvent event) {
+    executor.execute(() -> onTickPriceEvent(event.tickPrice()));
   }
 }

@@ -1,19 +1,20 @@
 package com.ibkr.service;
 
-import com.ib.client.Contract;
 import com.ibkr.client.IBClient;
-import com.ibkr.domain.MarketDataSubscriptionEvent;
+import com.ibkr.events.MarketDataSubscriptionEvent;
+import com.ibkr.events.RequestMarketDataSnapshotEvent;
 import com.ibkr.strategy.Strategy;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
 /**
  * Service responsible for subscription to market data feeds via TWS API.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MarketDataService {
@@ -26,11 +27,20 @@ public class MarketDataService {
    * {@link Strategy} instances to prevent redundant API calls and potential pacing violations.
    */
   @EventListener(MarketDataSubscriptionEvent.class)
-  public void requestMarketData() {
-    Set<Contract> contracts = strategies.stream().map(Strategy::getContract)
-        .collect(Collectors.toSet());
-    contracts.forEach(contract -> ib.client()
-        .reqRealTimeBars(ib.getNextRequestId(), contract, 5, "TRADES", false, null)
-    );
+  private void requestMarketData() {
+    strategies.stream().map(Strategy::getContractDetails).collect(Collectors.toSet())
+        .forEach(contract -> ib.client()
+            .reqRealTimeBars(IBClient.getNextRequestId(), contract, 5, "TRADES", true, null)
+        );
+  }
+
+  /**
+   * Processes market data snapshot request for the given contract.
+   *
+   * @param event containing request ID and the contract
+   */
+  @EventListener
+  private void requestMarketDataSnapshot(RequestMarketDataSnapshotEvent event) {
+    ib.client().reqMktData(event.requestId(), event.contract(), "", true, false, null);
   }
 }

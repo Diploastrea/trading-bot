@@ -1,4 +1,4 @@
-package com.ibkr.domain;
+package com.ibkr.events;
 
 import com.ib.client.protobuf.RealTimeBarTickProto.RealTimeBarTick;
 

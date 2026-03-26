@@ -3,7 +3,7 @@ package com.ibkr.client;
 import com.ib.client.EClientSocket;
 import com.ib.client.EJavaSignal;
 import com.ib.client.EReader;
-import com.ibkr.domain.MarketDataSubscriptionEvent;
+import com.ibkr.events.MarketDataSubscriptionEvent;
 import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -32,9 +32,9 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class IBClient {
 
+  private static final AtomicInteger nextRequestId = new AtomicInteger();
   private static final AtomicBoolean isReconnecting = new AtomicBoolean(false);
   private static final AtomicBoolean readerThreadRunning = new AtomicBoolean(false);
-  private final AtomicInteger nextRequestId = new AtomicInteger();
   private final EJavaSignal signal;
   private final EClientSocket client;
   private final ExecutorService executor;
@@ -51,20 +51,11 @@ public class IBClient {
   private int clientId;
 
   /**
-   * Returns an instance of {@link EClientSocket} used to send TWS API requests.
-   *
-   * @return {@link EClientSocket} object
-   */
-  public EClientSocket client() {
-    return client;
-  }
-
-  /**
    * Returns and increments the next valid request ID.
    *
    * @return next request ID
    */
-  public int getNextRequestId() {
+  public static int getNextRequestId() {
     return nextRequestId.getAndIncrement();
   }
 
@@ -74,7 +65,16 @@ public class IBClient {
    * @param nextRequestId next request ID
    */
   public void setNextRequestId(int nextRequestId) {
-    this.nextRequestId.set(nextRequestId);
+    IBClient.nextRequestId.set(nextRequestId);
+  }
+
+  /**
+   * Returns an instance of {@link EClientSocket} used to send TWS API requests.
+   *
+   * @return {@link EClientSocket} object
+   */
+  public EClientSocket client() {
+    return client;
   }
 
   /**
