@@ -22,7 +22,7 @@ public class OrderService {
    * @param event containing {@link List} of {@link Order} for given contract
    */
   @EventListener
-  private void placeOrders(PlaceOrderEvent event) {
+  public void handlePlaceOrderEvent(PlaceOrderEvent event) {
     event.orders()
         .forEach(order -> ib.client().placeOrder(order.orderId(), event.contract(), order));
     List<Integer> orderIds = event.orders().stream().map(Order::orderId).toList();

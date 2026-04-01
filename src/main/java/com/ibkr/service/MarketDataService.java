@@ -27,7 +27,8 @@ public class MarketDataService {
    * {@link Strategy} instances to prevent redundant API calls and potential pacing violations.
    */
   @EventListener(MarketDataSubscriptionEvent.class)
-  private void requestMarketData() {
+  public void handleMarketDataSubscriptionEvent() {
+    log.info("Subscribing to real time market data.");
     strategies.stream().map(Strategy::getContractDetails).collect(Collectors.toSet())
         .forEach(contract -> ib.client()
             .reqRealTimeBars(IBClient.getNextRequestId(), contract, 5, "TRADES", true, null)
@@ -40,7 +41,7 @@ public class MarketDataService {
    * @param event containing request ID and the contract
    */
   @EventListener
-  private void requestMarketDataSnapshot(RequestMarketDataSnapshotEvent event) {
+  public void handleRequestMarketDataSnapshotEvent(RequestMarketDataSnapshotEvent event) {
     ib.client().reqMktData(event.requestId(), event.contract(), "", true, false, null);
   }
 }

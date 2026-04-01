@@ -10,6 +10,7 @@ import com.ib.client.DeltaNeutralContract;
 import com.ib.client.DepthMktDataDescription;
 import com.ib.client.EReader;
 import com.ib.client.EWrapper;
+import com.ib.client.EWrapperMsgGenerator;
 import com.ib.client.Execution;
 import com.ib.client.FamilyCode;
 import com.ib.client.HistogramEntry;
@@ -377,7 +378,7 @@ public class EWrapperImpl implements EWrapper {
    */
   @Override
   public void error(Exception e) {
-    log.error("IB exception: {}", e.getMessage(), e);
+    log.error("IB exception: {}", EWrapperMsgGenerator.error(e));
   }
 
   /**
@@ -387,7 +388,7 @@ public class EWrapperImpl implements EWrapper {
    */
   @Override
   public void error(String errorMessage) {
-    log.error("IB error: {}", errorMessage);
+    log.error("IB error: {}", EWrapperMsgGenerator.error(errorMessage));
   }
 
   @Override
@@ -785,24 +786,14 @@ public class EWrapperImpl implements EWrapper {
 
   }
 
-  /**
-   * Callback invoked when an account summary update is received.
-   *
-   * @param accountSummary protobuf message
-   */
   @Override
   public void accountSummaryProtoBuf(AccountSummary accountSummary) {
-    log.info("Request ID: {}. Account summary: {}", accountSummary.getReqId(), accountSummary);
+
   }
 
-  /**
-   * Callback invoked after all account summary data has been delivered.
-   *
-   * @param accountSummaryEnd protobuf message
-   */
   @Override
   public void accountSummaryEndProtoBuf(AccountSummaryEnd accountSummaryEnd) {
-    log.info("Request ID: {}. End of account summary.", accountSummaryEnd.getReqId());
+
   }
 
   @Override
@@ -847,7 +838,6 @@ public class EWrapperImpl implements EWrapper {
    */
   @Override
   public void realTimeBarTickProtoBuf(RealTimeBarTick realTimeBarTick) {
-    log.debug("realTimeBar: {}", realTimeBarTick);
     publisher.publishEvent(new BarTickEvent(realTimeBarTick));
   }
 

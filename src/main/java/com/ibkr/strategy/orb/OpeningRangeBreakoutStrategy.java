@@ -42,6 +42,7 @@ public class OpeningRangeBreakoutStrategy extends AbstractStrategy {
   private static final ZoneId NY_TIME_ZONE = ZoneId.of("America/New_York");
   private static final LocalTime NYSE_OPEN = LocalTime.of(9, 30);
   private static final LocalTime LAST_TRADE_CUTOFF = LocalTime.of(14, 0);
+  private static final DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyyMMdd");
   private final DoubleAccumulator PRICE_HIGH = new DoubleAccumulator(Math::max,
       Double.NEGATIVE_INFINITY);
   private final DoubleAccumulator PRICE_LOW = new DoubleAccumulator(Math::min,
@@ -87,8 +88,10 @@ public class OpeningRangeBreakoutStrategy extends AbstractStrategy {
         log.info("Opening range finalized - high: {}, low: {}", PRICE_HIGH, PRICE_LOW);
         isOpeningRangeFinalized = true;
       }
-      Optional<RealTimeBarTick> optionalTick = aggregator.handleBarTick(tick);
-      optionalTick.ifPresent(this::detectBreakout);
+      if (!isPositionOpen) {
+        Optional<RealTimeBarTick> optionalTick = aggregator.handleBarTick(tick);
+        optionalTick.ifPresent(this::detectBreakout);
+      }
     }
   }
 
@@ -104,12 +107,10 @@ public class OpeningRangeBreakoutStrategy extends AbstractStrategy {
       askPrice = tick.getPrice();
     }
 
-    if (bidPrice > 0 && askPrice > 0) {
+    if (bidPrice > 0 && askPrice > 0 && !isPositionOpen) {
+      isPositionOpen = true;
       List<Order> bracketOrder = createBracketOrder(bidPrice, askPrice);
-      if (!isPositionOpen) {
-        isPositionOpen = true;
-        publisher.publishEvent(new PlaceOrderEvent(currentContract, bracketOrder));
-      }
+      publisher.publishEvent(new PlaceOrderEvent(currentContract, bracketOrder));
     }
   }
 
@@ -140,10 +141,7 @@ public class OpeningRangeBreakoutStrategy extends AbstractStrategy {
    * @param tick aggregated bar tick
    */
   private void detectBreakout(RealTimeBarTick tick) {
-    if (isPositionOpen) {
-      return;
-    }
-    log.debug("Processing aggregated bar tick for {} strategy", Thread.currentThread().getName());
+    log.debug("Processing aggregated bar tick for {} strategy.", Thread.currentThread().getName());
 
     Contract contract = null;
     if (tick.getClose() > PRICE_HIGH.doubleValue()) {
@@ -178,8 +176,7 @@ public class OpeningRangeBreakoutStrategy extends AbstractStrategy {
     contract.secType(SecType.OPT);
     contract.exchange("SMART");
     contract.currency("USD");
-    contract.lastTradeDateOrContractMonth(
-        LocalDate.now(NY_TIME_ZONE).format(DateTimeFormatter.ofPattern("yyyyMMdd")));
+    contract.lastTradeDateOrContractMonth(LocalDate.now(NY_TIME_ZONE).format(dtf));
     contract.strike(strike);
     contract.right(right);
     contract.multiplier("100");
@@ -197,8 +194,8 @@ public class OpeningRangeBreakoutStrategy extends AbstractStrategy {
   private List<Order> createBracketOrder(double bidPrice, double askPrice) {
     int parentOrderId = IBClient.getNextRequestId();
     double midPrice = (bidPrice + askPrice) / 2;
-    double limitPrice = Math.ceil(midPrice * 100) / 100;
-    double tpLimitPrice = limitPrice * 2;
+    double limitPrice = Math.floor(midPrice * 100) / 100;
+    double tpLimitPrice = Math.floor((limitPrice * 2) * 100.0) / 100.0;
     double slLimitPrice = Math.floor((limitPrice * 0.50) * 100.0) / 100.0;
 
     Order parent = new Order();
@@ -207,6 +204,7 @@ public class OpeningRangeBreakoutStrategy extends AbstractStrategy {
     parent.orderType(LMT);
     parent.lmtPrice(limitPrice);
     parent.totalQuantity(ONE);
+    parent.orderRef(Thread.currentThread().getName());
     parent.transmit(false);
 
     Order takeProfit = new Order();
