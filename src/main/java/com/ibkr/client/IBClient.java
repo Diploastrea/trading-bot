@@ -7,6 +7,7 @@ import com.ibkr.events.MarketDataSubscriptionEvent;
 import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -35,9 +36,9 @@ public class IBClient {
   private static final AtomicInteger nextRequestId = new AtomicInteger();
   private static final AtomicBoolean isReconnecting = new AtomicBoolean(false);
   private static final AtomicBoolean readerThreadRunning = new AtomicBoolean(false);
+  private static final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
   private final EJavaSignal signal;
   private final EClientSocket client;
-  private final ExecutorService executor;
   private final ApplicationEventPublisher publisher;
   private volatile CountDownLatch latch = new CountDownLatch(1);
 
@@ -120,8 +121,8 @@ public class IBClient {
           return;
         }
 
-        log.error("TWS API connection handshake timed out, attempting to reconnect...");
-        Thread.sleep(15000);
+        log.error("TWS API connection handshake timed out, attempting to reconnect in 20s...");
+        Thread.sleep(20000);
       }
     } catch (InterruptedException e) {
       log.error(e.getMessage(), e);

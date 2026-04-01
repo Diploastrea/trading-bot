@@ -401,7 +401,7 @@ public class EWrapperImpl implements EWrapper {
   @Override
   public void connectionClosed() {
     log.error("TWS API connection closed, attempting to reconnect...");
-    executor.execute(client::connect);
+    client.connect();
   }
 
   @Override
