@@ -4,6 +4,7 @@ import com.ibkr.events.BarTickEvent;
 import com.ibkr.events.TickPriceEvent;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 
 /**
@@ -12,6 +13,7 @@ import org.springframework.context.event.EventListener;
  * <p>Each instance maintains a private, single-threaded virtual executor to process market data
  * ticks sequentially without blocking other strategies or the market data feed.
  */
+@Slf4j
 public abstract class AbstractStrategy implements Strategy {
 
   private final ExecutorService executor;
@@ -32,7 +34,7 @@ public abstract class AbstractStrategy implements Strategy {
    */
   @EventListener
   private void handleBarTickEvent(BarTickEvent event) {
-    executor.execute(() -> onBarTickEvent(event.realTimeBarTick()));
+    safeExecute(() -> onBarTickEvent(event.realTimeBarTick()));
   }
 
   /**
@@ -42,6 +44,16 @@ public abstract class AbstractStrategy implements Strategy {
    */
   @EventListener
   private void handleTickPriceEvent(TickPriceEvent event) {
-    executor.execute(() -> onTickPriceEvent(event.tickPrice()));
+    safeExecute(() -> onTickPriceEvent(event.tickPrice()));
+  }
+
+  private void safeExecute(Runnable task) {
+    executor.execute(() -> {
+      try {
+        task.run();
+      } catch (Exception e) {
+        log.error("Exception while running task", e);
+      }
+    });
   }
 }
