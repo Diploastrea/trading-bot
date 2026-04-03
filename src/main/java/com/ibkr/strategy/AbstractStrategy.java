@@ -2,6 +2,9 @@ package com.ibkr.strategy;
 
 import com.ibkr.events.BarTickEvent;
 import com.ibkr.events.TickPriceEvent;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +19,10 @@ import org.springframework.context.event.EventListener;
 @Slf4j
 public abstract class AbstractStrategy implements Strategy {
 
+  public static final DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyyMMdd");
+  protected static final ZoneId NY_TIME_ZONE = ZoneId.of("America/New_York");
+  protected static final LocalTime NYSE_OPEN = LocalTime.of(9, 30);
+  protected static final LocalTime LAST_TRADE_CUTOFF = LocalTime.of(14, 0);
   private final ExecutorService executor;
 
   /**

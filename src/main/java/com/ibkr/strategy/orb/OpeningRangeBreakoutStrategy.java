@@ -23,8 +23,6 @@ import com.ibkr.strategy.BarTickAggregator;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -39,10 +37,6 @@ import org.springframework.context.ApplicationEventPublisher;
 @Slf4j
 public class OpeningRangeBreakoutStrategy extends AbstractStrategy {
 
-  private static final ZoneId NY_TIME_ZONE = ZoneId.of("America/New_York");
-  private static final LocalTime NYSE_OPEN = LocalTime.of(9, 30);
-  private static final LocalTime LAST_TRADE_CUTOFF = LocalTime.of(14, 0);
-  private static final DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyyMMdd");
   private final DoubleAccumulator PRICE_HIGH = new DoubleAccumulator(Math::max,
       Double.NEGATIVE_INFINITY);
   private final DoubleAccumulator PRICE_LOW = new DoubleAccumulator(Math::min,
