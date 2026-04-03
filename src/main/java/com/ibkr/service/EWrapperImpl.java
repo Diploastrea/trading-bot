@@ -109,12 +109,15 @@ import com.ib.client.protobuf.WshEventDataProto.WshEventData;
 import com.ib.client.protobuf.WshMetaDataProto.WshMetaData;
 import com.ibkr.client.IBClient;
 import com.ibkr.events.BarTickEvent;
+import com.ibkr.events.OpenOrderEvent;
+import com.ibkr.events.OrderStatusEvent;
 import com.ibkr.events.TickPriceEvent;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -136,7 +139,8 @@ public class EWrapperImpl implements EWrapper {
 
   private final IBClient client;
   private final ApplicationEventPublisher publisher;
-  private final ExecutorService executor;
+  private final ExecutorService sequentialExecutor = Executors.newSingleThreadExecutor(
+      Thread.ofVirtual().factory());
 
   @Override
   public void tickPrice(int requestId, int tickType, double price, TickAttrib attributes) {
@@ -622,12 +626,12 @@ public class EWrapperImpl implements EWrapper {
 
   @Override
   public void orderStatusProtoBuf(OrderStatus orderStatus) {
-
+    sequentialExecutor.execute(() -> publisher.publishEvent(new OrderStatusEvent(orderStatus)));
   }
 
   @Override
   public void openOrderProtoBuf(OpenOrder openOrder) {
-
+    sequentialExecutor.execute(() -> publisher.publishEvent(new OpenOrderEvent(openOrder)));
   }
 
   @Override
