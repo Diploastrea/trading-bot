@@ -54,16 +54,13 @@ public class OpeningRangeBreakoutStrategy extends AbstractStrategy {
   /**
    * Initialises an ORB strategy instance with a specific cutoff time for the opening range.
    *
-   * @param strategyName       strategy name used for logging and monitoring
-   * @param openingRangeCutoff cutoff time at which the opening range is finalised
-   * @param barSize            bar size used for breakout detection (in minutes)
-   * @param publisher          event publisher for downstream orders and data requests
+   * @param orbConfig enum with specific strategy configurations
+   * @param publisher event publisher for downstream orders and data requests
    */
-  public OpeningRangeBreakoutStrategy(String strategyName, LocalTime openingRangeCutoff,
-      int barSize, ApplicationEventPublisher publisher) {
-    super(strategyName);
-    this.openingRangeCutoff = openingRangeCutoff;
-    this.aggregator = new BarTickAggregator(barSize);
+  public OpeningRangeBreakoutStrategy(ORBConfig orbConfig, ApplicationEventPublisher publisher) {
+    super(orbConfig.getName());
+    this.openingRangeCutoff = orbConfig.getCutoffTime();
+    this.aggregator = orbConfig.getAggregator();
     this.publisher = publisher;
   }
 
