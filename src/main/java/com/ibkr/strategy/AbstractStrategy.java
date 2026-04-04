@@ -41,7 +41,7 @@ public abstract class AbstractStrategy implements Strategy {
    */
   @EventListener
   private void handleBarTickEvent(BarTickEvent event) {
-    safeExecute(() -> onBarTickEvent(event.realTimeBarTick()));
+    safeExecute(() -> onRealTimeBarTickEvent(event.realTimeBarTick()));
   }
 
   /**

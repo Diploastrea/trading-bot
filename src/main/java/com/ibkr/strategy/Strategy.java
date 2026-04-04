@@ -17,7 +17,7 @@ public interface Strategy {
    *
    * @param realTimeBarTick object containing OHLC and volume data
    */
-  void onBarTickEvent(RealTimeBarTick realTimeBarTick);
+  void onRealTimeBarTickEvent(RealTimeBarTick realTimeBarTick);
 
   /**
    * Callback invoked whenever a tick price is received from TWS API.

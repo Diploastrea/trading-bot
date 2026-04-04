@@ -65,7 +65,7 @@ public class OpeningRangeBreakoutStrategy extends AbstractStrategy {
   }
 
   @Override
-  public void onBarTickEvent(RealTimeBarTick tick) {
+  public void onRealTimeBarTickEvent(RealTimeBarTick tick) {
     LocalTime currentTime = Instant.ofEpochSecond(tick.getTime()).atZone(NY_TIME_ZONE)
         .toLocalTime();
     // Recording opening range phase
