@@ -1,14 +1,14 @@
 CREATE TABLE trades
 (
     order_id      BIGINT        NOT NULL PRIMARY KEY,
-    strategy_name VARCHAR(20)   NOT NULL,
-    date          DATE          NOT NULL,
-    type          VARCHAR(1)    NOT NULL,
-    symbol        VARCHAR(4)    NOT NULL,
-    quantity      INTEGER       NOT NULL,
-    strike        NUMERIC(6, 2) NOT NULL,
-    fill          NUMERIC(6, 2),
+    strategy_name VARCHAR(20),
+    date          DATE,
+    type          VARCHAR(1),
+    symbol        VARCHAR(4),
+    quantity      INTEGER,
+    strike        NUMERIC(6, 2),
+    fill          NUMERIC(6, 2) NOT NULL,
     exit          NUMERIC(6, 2),
-    fee           NUMERIC(4, 2) NOT NULL,
-    pnl           NUMERIC(6, 2)
+    fee           NUMERIC(8, 6),
+    pnl           NUMERIC(12, 6)
 );

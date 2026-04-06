@@ -19,7 +19,7 @@ import org.springframework.context.event.EventListener;
 @Slf4j
 public abstract class AbstractStrategy implements Strategy {
 
-  public static final DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyyMMdd");
+  public static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
   protected static final ZoneId NY_TIME_ZONE = ZoneId.of("America/New_York");
   protected static final LocalTime NYSE_OPEN = LocalTime.of(9, 30);
   protected static final LocalTime LAST_TRADE_CUTOFF = LocalTime.of(14, 0);

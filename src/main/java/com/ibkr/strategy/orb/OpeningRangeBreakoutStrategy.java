@@ -167,7 +167,7 @@ public class OpeningRangeBreakoutStrategy extends AbstractStrategy {
     contract.secType(SecType.OPT);
     contract.exchange("SMART");
     contract.currency("USD");
-    contract.lastTradeDateOrContractMonth(LocalDate.now(NY_TIME_ZONE).format(dtf));
+    contract.lastTradeDateOrContractMonth(LocalDate.now(NY_TIME_ZONE).format(FORMATTER));
     contract.strike(strike);
     contract.right(right);
     contract.multiplier("100");

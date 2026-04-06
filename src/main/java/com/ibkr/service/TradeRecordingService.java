@@ -1,7 +1,7 @@
 package com.ibkr.service;
 
 import static com.ib.client.OrderStatus.Filled;
-import static com.ibkr.strategy.AbstractStrategy.dtf;
+import static com.ibkr.strategy.AbstractStrategy.FORMATTER;
 
 import com.ib.client.protobuf.ContractProto.Contract;
 import com.ib.client.protobuf.OpenOrderProto.OpenOrder;
@@ -30,11 +30,12 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class TradeRecordingService {
 
+  private static final BigDecimal CONTRACT_MULTIPLIER = BigDecimal.valueOf(100);
   private final TradeRepository tradeRepository;
 
   /**
-   * Handles {@link OpenOrderEvent} by creating a new record for entry orders or updates the fee for
-   * exit orders.
+   * Handles {@link OpenOrderEvent} by setting order details and calculates profit and loss once
+   * exit the position is closed.
    *
    * @param event containing order details and the underlying financial instrument
    */
@@ -54,27 +55,32 @@ public class TradeRecordingService {
     Contract contract = openOrder.getContract();
     Trade trade;
     if (isEntryOrder) {
-      trade = Trade.builder()
-          .orderId((long) openOrder.getOrderId())
-          .strategyName(order.getOrderRef())
-          .date(LocalDate.parse(contract.getLastTradeDateOrContractMonth(), dtf))
-          .type(contract.getRight())
-          .symbol(contract.getSymbol())
-          .quantity(Integer.parseInt(order.getTotalQuantity()))
-          .strike(BigDecimal.valueOf(contract.getStrike()))
-          .fee(BigDecimal.valueOf(orderState.getCommissionAndFees()))
-          .build();
+      trade = findByIdOrThrow(openOrder.getOrderId());
+      trade.setStrategyName(order.getOrderRef());
+      trade.setDate(LocalDate.parse(contract.getLastTradeDateOrContractMonth(), FORMATTER));
+      trade.setType(contract.getRight());
+      trade.setSymbol(contract.getSymbol());
+      trade.setQuantity(Integer.parseInt(order.getTotalQuantity()));
+      trade.setStrike(BigDecimal.valueOf(contract.getStrike()));
+      trade.setFee(BigDecimal.valueOf(orderState.getCommissionAndFees()));
     } else {
       trade = findByIdOrThrow(order.getParentId());
       trade.setFee(trade.getFee().add(BigDecimal.valueOf(orderState.getCommissionAndFees())));
+      BigDecimal pnl = trade.getExit()
+          .subtract(trade.getFill())
+          .multiply(BigDecimal.valueOf(trade.getQuantity()))
+          .multiply(CONTRACT_MULTIPLIER)
+          .subtract(trade.getFee());
+      trade.setPnl(pnl);
+      log.info("Order ID {} closed with a PnL of: {}", trade.getOrderId(), trade.getPnl());
     }
 
     tradeRepository.save(trade);
   }
 
   /**
-   * Handles an {@link OrderStatusEvent} by updating fill or exit prices and calculates PnL for
-   * closed positions.
+   * Handles {@link OrderStatusEvent} by creating a new record for each entry order and setting fill
+   * price. For exit orders, exit price will be set instead.
    *
    * @param event containing order status details
    */
@@ -82,27 +88,25 @@ public class TradeRecordingService {
   @EventListener
   public void handleOrderStatusEvent(OrderStatusEvent event) {
     OrderStatus orderStatus = event.orderStatus();
-    if (!Objects.equals(orderStatus.getStatus(), Filled.name())) {
+    long orderId = orderStatus.getOrderId();
+    if (!Objects.equals(orderStatus.getStatus(), Filled.name())
+        || tradeRepository.existsById(orderId)) {
       return;
     }
 
     boolean isEntryOrder = orderStatus.getParentId() == 0;
-    long orderId = isEntryOrder ? orderStatus.getOrderId() : orderStatus.getParentId();
-    Trade trade = findByIdOrThrow(orderId);
+    double averagePrice = orderStatus.getAvgFillPrice();
+    Trade trade;
     if (isEntryOrder) {
-      log.info("Entry order ID {} filled at the average price of {}", orderStatus.getOrderId(),
-          orderStatus.getAvgFillPrice());
-      trade.setFill(BigDecimal.valueOf(orderStatus.getAvgFillPrice()));
+      log.info("Entry order ID {} filled at the average price of {}", orderId, averagePrice);
+      trade = Trade.builder()
+          .orderId(orderId)
+          .fill(BigDecimal.valueOf(averagePrice))
+          .build();
     } else {
-      log.info("Exit order ID {} filled at the average price of {}", orderStatus.getOrderId(),
-          orderStatus.getAvgFillPrice());
-      trade.setExit(BigDecimal.valueOf(orderStatus.getAvgFillPrice()));
-      BigDecimal pnl = trade.getExit()
-          .subtract(trade.getFill())
-          .multiply(BigDecimal.valueOf(trade.getQuantity()))
-          .multiply(BigDecimal.valueOf(100))
-          .subtract(trade.getFee());
-      trade.setPnl(pnl);
+      log.info("Exit order ID {} filled at the average price of {}", orderId, averagePrice);
+      trade = findByIdOrThrow(orderStatus.getParentId());
+      trade.setExit(BigDecimal.valueOf(averagePrice));
     }
 
     tradeRepository.save(trade);
