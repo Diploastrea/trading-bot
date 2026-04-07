@@ -57,7 +57,7 @@ public class OpeningRangeBreakoutStrategy extends AbstractStrategy {
    * @param orbConfig enum with specific strategy configurations
    * @param publisher event publisher for downstream orders and data requests
    */
-  public OpeningRangeBreakoutStrategy(ORBConfig orbConfig, ApplicationEventPublisher publisher) {
+  public OpeningRangeBreakoutStrategy(OrbConfig orbConfig, ApplicationEventPublisher publisher) {
     super(orbConfig.getName());
     this.openingRangeCutoff = orbConfig.getCutoffTime();
     this.aggregator = orbConfig.getAggregator();
@@ -65,7 +65,7 @@ public class OpeningRangeBreakoutStrategy extends AbstractStrategy {
   }
 
   @Override
-  public void onRealTimeBarTickEvent(RealTimeBarTick tick) {
+  public void onRealTimeBarTick(RealTimeBarTick tick) {
     LocalTime currentTime = Instant.ofEpochSecond(tick.getTime()).atZone(NY_TIME_ZONE)
         .toLocalTime();
     // Recording opening range phase
@@ -87,7 +87,7 @@ public class OpeningRangeBreakoutStrategy extends AbstractStrategy {
   }
 
   @Override
-  public void onTickPriceEvent(TickPrice tick) {
+  public void onTickPrice(TickPrice tick) {
     if (tick.getReqId() != spotPriceRequestId) {
       return;
     }
@@ -135,16 +135,18 @@ public class OpeningRangeBreakoutStrategy extends AbstractStrategy {
     log.debug("Processing aggregated bar tick for {} strategy.", Thread.currentThread().getName());
 
     Contract contract = null;
-    if (tick.getClose() > PRICE_HIGH.doubleValue()) {
+    double close = tick.getClose();
+    double vwap = getVwap();
+    if (close > PRICE_HIGH.doubleValue() && close > vwap) {
       log.info(
-          "Detected bullish price breakout, creating call option contract with strike price of {}.",
-          ceil(tick.getClose()));
-      contract = createOptionContract(ceil(tick.getClose()), Call.name());
-    } else if (tick.getClose() < PRICE_LOW.doubleValue()) {
+          "Bullish price breakout above VWAP {}, buying call option with strike price of {}.",
+          vwap, ceil(close));
+      contract = createOptionContract(ceil(close), Call.name());
+    } else if (close < PRICE_LOW.doubleValue() && close < vwap) {
       log.info(
-          "Detected bearish price breakout, creating put option contract with strike price of {}.",
-          floor(tick.getClose()));
-      contract = createOptionContract(floor(tick.getClose()), Put.name());
+          "Bearish price breakdown below VWAP {}, buying put option with strike price of {}.",
+          vwap, floor(close));
+      contract = createOptionContract(floor(close), Put.name());
     }
 
     if (Objects.nonNull(contract)) {

@@ -1,9 +1,9 @@
 package com.ibkr.strategy.orb;
 
-import static com.ibkr.strategy.orb.ORBConfig.FIFTEEN_MIN_ORB;
-import static com.ibkr.strategy.orb.ORBConfig.FIVE_MIN_ORB;
-import static com.ibkr.strategy.orb.ORBConfig.FOUR_HOUR_ORB;
-import static com.ibkr.strategy.orb.ORBConfig.THIRTY_MIN_ORB;
+import static com.ibkr.strategy.orb.OrbConfig.FIFTEEN_MIN_ORB;
+import static com.ibkr.strategy.orb.OrbConfig.FIVE_MIN_ORB;
+import static com.ibkr.strategy.orb.OrbConfig.THIRTY_MIN_ORB;
+import static com.ibkr.strategy.orb.OrbConfig.TWO_HOUR_ORB;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -26,7 +26,7 @@ public class OpeningRangeBreakoutStrategyRegistry {
    * @return an instance of {@link OpeningRangeBreakoutStrategy}
    */
   @Bean
-  public OpeningRangeBreakoutStrategy SPY5MinORBStrategy() {
+  public OpeningRangeBreakoutStrategy fiveMinOrbStrategy() {
     return new OpeningRangeBreakoutStrategy(FIVE_MIN_ORB, publisher);
   }
 
@@ -36,7 +36,7 @@ public class OpeningRangeBreakoutStrategyRegistry {
    * @return an instance of {@link OpeningRangeBreakoutStrategy}
    */
   @Bean
-  public OpeningRangeBreakoutStrategy SPY15MinORBStrategy() {
+  public OpeningRangeBreakoutStrategy fifteenMinOrbStrategy() {
     return new OpeningRangeBreakoutStrategy(FIFTEEN_MIN_ORB, publisher);
   }
 
@@ -46,17 +46,17 @@ public class OpeningRangeBreakoutStrategyRegistry {
    * @return an instance of {@link OpeningRangeBreakoutStrategy}
    */
   @Bean
-  public OpeningRangeBreakoutStrategy SPY30MinORBStrategy() {
+  public OpeningRangeBreakoutStrategy thirtyMinOrbStrategy() {
     return new OpeningRangeBreakoutStrategy(THIRTY_MIN_ORB, publisher);
   }
 
   /**
-   * Creates and returns {@link OpeningRangeBreakoutStrategy} with 4 hours opening range window.
+   * Creates and returns {@link OpeningRangeBreakoutStrategy} with 2 hours opening range window.
    *
    * @return an instance of {@link OpeningRangeBreakoutStrategy}
    */
   @Bean
-  public OpeningRangeBreakoutStrategy SPY4HourORBStrategy() {
-    return new OpeningRangeBreakoutStrategy(FOUR_HOUR_ORB, publisher);
+  public OpeningRangeBreakoutStrategy twoHourOrbStrategy() {
+    return new OpeningRangeBreakoutStrategy(TWO_HOUR_ORB, publisher);
   }
 }

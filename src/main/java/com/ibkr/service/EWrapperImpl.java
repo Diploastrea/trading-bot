@@ -108,7 +108,7 @@ import com.ib.client.protobuf.VerifyMessageApiProto.VerifyMessageApi;
 import com.ib.client.protobuf.WshEventDataProto.WshEventData;
 import com.ib.client.protobuf.WshMetaDataProto.WshMetaData;
 import com.ibkr.client.IBClient;
-import com.ibkr.events.BarTickEvent;
+import com.ibkr.events.RealTimeBarTickEvent;
 import com.ibkr.events.OpenOrderEvent;
 import com.ibkr.events.OrderStatusEvent;
 import com.ibkr.events.TickPriceEvent;
@@ -842,7 +842,7 @@ public class EWrapperImpl implements EWrapper {
    */
   @Override
   public void realTimeBarTickProtoBuf(RealTimeBarTick realTimeBarTick) {
-    publisher.publishEvent(new BarTickEvent(realTimeBarTick));
+    publisher.publishEvent(new RealTimeBarTickEvent(realTimeBarTick));
   }
 
   @Override

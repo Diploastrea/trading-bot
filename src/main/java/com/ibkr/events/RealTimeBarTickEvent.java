@@ -5,8 +5,8 @@ import com.ib.client.protobuf.RealTimeBarTickProto.RealTimeBarTick;
 /**
  * Event published when a new bar tick is received from TWS API.
  *
- * @param realTimeBarTick object containing OHLC and volume data
+ * @param realTimeBarTick object containing OHLC data
  */
-public record BarTickEvent(RealTimeBarTick realTimeBarTick) {
+public record RealTimeBarTickEvent(RealTimeBarTick realTimeBarTick) {
 
 }

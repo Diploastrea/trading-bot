@@ -14,12 +14,12 @@ import lombok.RequiredArgsConstructor;
  */
 @Getter
 @RequiredArgsConstructor
-public enum ORBConfig {
+public enum OrbConfig {
 
   FIVE_MIN_ORB("5-min-orb", LocalTime.of(9, 35), new BarTickAggregator(1)),
   FIFTEEN_MIN_ORB("15-min-orb", LocalTime.of(9, 45), new BarTickAggregator(1)),
   THIRTY_MIN_ORB("30-min-orb", LocalTime.of(10, 0), new BarTickAggregator(3)),
-  FOUR_HOUR_ORB("4-hour-orb", LocalTime.of(13, 30), new BarTickAggregator(5));
+  TWO_HOUR_ORB("2-hour-orb", LocalTime.of(11, 30), new BarTickAggregator(5));
 
   private final String name;
   private final LocalTime cutoffTime;
