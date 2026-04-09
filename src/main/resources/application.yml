@@ -26,5 +26,5 @@ logging:
 
 ibkr:
   host: 127.0.0.1
-  port: 7497
+  port: 7496
   client-id: 0

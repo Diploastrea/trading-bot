@@ -16,10 +16,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum OrbConfig {
 
-  FIVE_MIN_ORB("5-min-orb", LocalTime.of(9, 35), new BarTickAggregator(1)),
-  FIFTEEN_MIN_ORB("15-min-orb", LocalTime.of(9, 45), new BarTickAggregator(1)),
-  THIRTY_MIN_ORB("30-min-orb", LocalTime.of(10, 0), new BarTickAggregator(3)),
-  TWO_HOUR_ORB("2-hour-orb", LocalTime.of(11, 30), new BarTickAggregator(5));
+  FIFTEEN_MIN_ORB("spy-15m-orb", LocalTime.of(9, 45), new BarTickAggregator(1));
 
   private final String name;
   private final LocalTime cutoffTime;
