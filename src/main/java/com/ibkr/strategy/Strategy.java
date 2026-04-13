@@ -10,7 +10,7 @@ import com.ib.client.protobuf.TickPriceProto.TickPrice;
 public interface Strategy {
 
   /**
-   * Callback invoked whenever a bar tick is received from TWS API.
+   * Handles callback invoked whenever a bar tick is received from TWS API.
    *
    * <p>This method is processed asynchronously within its own serialized executor to ensure thread
    * isolation and chronological ordering of price data.
@@ -20,7 +20,7 @@ public interface Strategy {
   void onRealTimeBarTick(RealTimeBarTick realTimeBarTick);
 
   /**
-   * Callback invoked whenever a tick price is received from TWS API.
+   * Handles callback invoked whenever a tick price is received from TWS API.
    *
    * <p>This method is processed asynchronously within its own serialized executor to ensure thread
    * isolation and chronological ordering of price data.

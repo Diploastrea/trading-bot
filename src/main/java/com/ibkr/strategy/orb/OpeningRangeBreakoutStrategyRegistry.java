@@ -2,9 +2,10 @@ package com.ibkr.strategy.orb;
 
 import static com.ibkr.strategy.orb.OrbConfig.FIFTEEN_MIN_ORB;
 import static com.ibkr.strategy.orb.OrbConfig.FIVE_MIN_ORB;
+import static com.ibkr.strategy.orb.OrbConfig.SIXTY_MIN_ORB;
 import static com.ibkr.strategy.orb.OrbConfig.THIRTY_MIN_ORB;
-import static com.ibkr.strategy.orb.OrbConfig.TWO_HOUR_ORB;
 
+import com.ibkr.strategy.indicators.Vwap;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
@@ -27,7 +28,7 @@ public class OpeningRangeBreakoutStrategyRegistry {
    */
   @Bean
   public OpeningRangeBreakoutStrategy fiveMinOrbStrategy() {
-    return new OpeningRangeBreakoutStrategy(FIVE_MIN_ORB, publisher);
+    return new OpeningRangeBreakoutStrategy(FIVE_MIN_ORB, publisher, new Vwap());
   }
 
   /**
@@ -37,7 +38,7 @@ public class OpeningRangeBreakoutStrategyRegistry {
    */
   @Bean
   public OpeningRangeBreakoutStrategy fifteenMinOrbStrategy() {
-    return new OpeningRangeBreakoutStrategy(FIFTEEN_MIN_ORB, publisher);
+    return new OpeningRangeBreakoutStrategy(FIFTEEN_MIN_ORB, publisher, new Vwap());
   }
 
   /**
@@ -47,16 +48,16 @@ public class OpeningRangeBreakoutStrategyRegistry {
    */
   @Bean
   public OpeningRangeBreakoutStrategy thirtyMinOrbStrategy() {
-    return new OpeningRangeBreakoutStrategy(THIRTY_MIN_ORB, publisher);
+    return new OpeningRangeBreakoutStrategy(THIRTY_MIN_ORB, publisher, new Vwap());
   }
 
   /**
-   * Creates and returns {@link OpeningRangeBreakoutStrategy} with 2 hours opening range window.
+   * Creates and returns {@link OpeningRangeBreakoutStrategy} with 60 mins opening range window.
    *
    * @return an instance of {@link OpeningRangeBreakoutStrategy}
    */
   @Bean
-  public OpeningRangeBreakoutStrategy twoHourOrbStrategy() {
-    return new OpeningRangeBreakoutStrategy(TWO_HOUR_ORB, publisher);
+  public OpeningRangeBreakoutStrategy sixtyMinOrbStrategy() {
+    return new OpeningRangeBreakoutStrategy(SIXTY_MIN_ORB, publisher, new Vwap());
   }
 }
