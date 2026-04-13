@@ -2,6 +2,7 @@ package com.ibkr.strategy.orb;
 
 import static com.ibkr.strategy.orb.OrbConfig.FIFTEEN_MIN_ORB;
 
+import com.ibkr.strategy.indicators.Vwap;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
@@ -24,6 +25,6 @@ public class OpeningRangeBreakoutStrategyRegistry {
    */
   @Bean
   public OpeningRangeBreakoutStrategy fifteenMinOrbStrategy() {
-    return new OpeningRangeBreakoutStrategy(FIFTEEN_MIN_ORB, publisher);
+    return new OpeningRangeBreakoutStrategy(FIFTEEN_MIN_ORB, publisher, new Vwap());
   }
 }

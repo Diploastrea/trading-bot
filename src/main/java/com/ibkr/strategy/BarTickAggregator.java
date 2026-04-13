@@ -43,6 +43,7 @@ public class BarTickAggregator {
     currentBarTick.setLow(min(currentBarTick.getLow(), tick.getLow()));
 
     if (--barTickCounter == 0) {
+      currentBarTick.setTime(tick.getTime());
       currentBarTick.setClose(tick.getClose());
       RealTimeBarTick completedBarTick = currentBarTick.build();
       currentBarTick = null;

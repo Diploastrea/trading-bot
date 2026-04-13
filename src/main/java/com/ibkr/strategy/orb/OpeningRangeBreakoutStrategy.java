@@ -1,14 +1,17 @@
 package com.ibkr.strategy.orb;
 
-import static com.ib.client.Decimal.ONE;
-import static com.ib.client.OrderType.LMT;
-import static com.ib.client.OrderType.STP;
-import static com.ib.client.Types.Action.BUY;
-import static com.ib.client.Types.Action.SELL;
 import static com.ib.client.Types.Right.Call;
 import static com.ib.client.Types.Right.Put;
+import static com.ibkr.statics.DateTimeUtil.isAfterOpeningRangeWindow;
+import static com.ibkr.statics.DateTimeUtil.isAfterTradingWindow;
+import static com.ibkr.statics.DateTimeUtil.isWithinOpeningRangeWindow;
+import static com.ibkr.statics.OrderUtil.createBracketOrder;
+import static com.ibkr.statics.OrderUtil.createOptionContract;
+import static com.ibkr.strategy.orb.StrategyState.BREAKOUT;
+import static com.ibkr.strategy.orb.StrategyState.OPENING_RANGE;
+import static com.ibkr.strategy.orb.StrategyState.PULLBACK;
+import static com.ibkr.strategy.orb.StrategyState.RETRACEMENT;
 import static java.lang.Math.ceil;
-import static java.lang.Math.floor;
 
 import com.ib.client.Contract;
 import com.ib.client.Order;
@@ -20,12 +23,13 @@ import com.ibkr.events.PlaceOrderEvent;
 import com.ibkr.events.RequestMarketDataSnapshotEvent;
 import com.ibkr.strategy.AbstractStrategy;
 import com.ibkr.strategy.BarTickAggregator;
-import java.time.Instant;
-import java.time.LocalDate;
+import com.ibkr.strategy.indicators.FibonacciRetracement;
+import com.ibkr.strategy.indicators.Vwap;
+import jakarta.annotation.Nullable;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.concurrent.atomic.DoubleAccumulator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -44,12 +48,18 @@ public class OpeningRangeBreakoutStrategy extends AbstractStrategy {
   private final LocalTime openingRangeCutoff;
   private final BarTickAggregator aggregator;
   private final ApplicationEventPublisher publisher;
-  private boolean isOpeningRangeFinalized = false;
-  private boolean isPositionOpen = false;
-  private int spotPriceRequestId;
+  private final List<RealTimeBarTick> lookbackWindow = new ArrayList<>(2);
+  private final Vwap vwap;
   private Contract currentContract;
-  private double bidPrice;
+  private FibonacciRetracement fib;
+  private StrategyState state = OPENING_RANGE;
+  private boolean isPositionOpen = false;
+  private boolean isBreakoutActive = false;
+  private boolean isBullishTrend = false;
   private double askPrice;
+  private double bidPrice;
+  private double risk;
+  private int spotPriceRequestId;
 
   /**
    * Initialises an ORB strategy instance with a specific cutoff time for the opening range.
@@ -57,33 +67,32 @@ public class OpeningRangeBreakoutStrategy extends AbstractStrategy {
    * @param orbConfig enum with specific strategy configurations
    * @param publisher event publisher for downstream orders and data requests
    */
-  public OpeningRangeBreakoutStrategy(OrbConfig orbConfig, ApplicationEventPublisher publisher) {
+  public OpeningRangeBreakoutStrategy(OrbConfig orbConfig, ApplicationEventPublisher publisher,
+      Vwap vwap) {
     super(orbConfig.getName());
     this.openingRangeCutoff = orbConfig.getCutoffTime();
     this.aggregator = orbConfig.getAggregator();
     this.publisher = publisher;
+    this.vwap = vwap;
   }
 
   @Override
   public void onRealTimeBarTick(RealTimeBarTick tick) {
-    LocalTime currentTime = Instant.ofEpochSecond(tick.getTime()).atZone(NY_TIME_ZONE)
-        .toLocalTime();
-    // Recording opening range phase
-    if (currentTime.isAfter(NYSE_OPEN) && currentTime.isBefore(openingRangeCutoff)) {
-      updateOpeningRange(tick);
+    if (isPositionOpen || isAfterTradingWindow(tick)) {
       return;
     }
-    // Detecting price breakout phase
-    if (currentTime.isAfter(openingRangeCutoff) && currentTime.isBefore(LAST_TRADE_CUTOFF)) {
-      if (!isOpeningRangeFinalized) {
-        log.info("Opening range finalized - high: {}, low: {}", PRICE_HIGH, PRICE_LOW);
-        isOpeningRangeFinalized = true;
+
+    vwap.update(tick);
+    aggregator.handleBarTick(tick).ifPresent(barTick -> {
+      log.debug("Current state: {}, price close: {}", state, barTick.getClose());
+      switch (state) {
+        case OPENING_RANGE -> updateOpeningRange(barTick);
+        case BREAKOUT -> detectBreakout(barTick);
+        case PULLBACK -> detectPullback(barTick);
+        case RETRACEMENT -> detectRetracement(barTick);
       }
-      if (!isPositionOpen) {
-        Optional<RealTimeBarTick> optionalTick = aggregator.handleBarTick(tick);
-        optionalTick.ifPresent(this::detectBreakout);
-      }
-    }
+      updateLookbackWindow(barTick);
+    });
   }
 
   @Override
@@ -100,7 +109,7 @@ public class OpeningRangeBreakoutStrategy extends AbstractStrategy {
 
     if (bidPrice > 0 && askPrice > 0 && !isPositionOpen) {
       isPositionOpen = true;
-      List<Order> bracketOrder = createBracketOrder(bidPrice, askPrice);
+      List<Order> bracketOrder = createBracketOrder(bidPrice, askPrice, risk);
       publisher.publishEvent(new PlaceOrderEvent(currentContract, bracketOrder));
     }
   }
@@ -117,36 +126,122 @@ public class OpeningRangeBreakoutStrategy extends AbstractStrategy {
   }
 
   /**
-   * Updates the high and low price based on the current tick.
+   * Pushes the latest bar tick to the sliding window to identify potential trend reversal.
+   *
+   * @param tick the latest aggregated bar tick
    */
-  private void updateOpeningRange(RealTimeBarTick tick) {
-    PRICE_HIGH.accumulate(tick.getHigh());
-    PRICE_LOW.accumulate(tick.getLow());
-    log.debug("Updating opening range, high: {}, low: {}", PRICE_HIGH, PRICE_LOW);
+  private void updateLookbackWindow(RealTimeBarTick tick) {
+    if (lookbackWindow.size() == 2) {
+      lookbackWindow.removeFirst();
+    }
+    lookbackWindow.add(tick);
   }
 
   /**
-   * Evaluates the price point of an aggregated bar tick against the established opening range.
-   * Triggers an option market data snapshot request if a breakout is confirmed.
+   * Updates the opening range high and low price based on the current tick.
+   *
+   * @param tick aggregated bar tick
+   */
+  private void updateOpeningRange(RealTimeBarTick tick) {
+    if (isAfterOpeningRangeWindow(tick, openingRangeCutoff)) {
+      log.info("Opening range finalized - high: {}, low: {}", PRICE_HIGH, PRICE_LOW);
+      detectBreakout(tick);
+      return;
+    }
+
+    if (isWithinOpeningRangeWindow(tick, openingRangeCutoff)) {
+      PRICE_HIGH.accumulate(tick.getHigh());
+      PRICE_LOW.accumulate(tick.getLow());
+      log.debug("Updating opening range, high: {}, low: {}", PRICE_HIGH, PRICE_LOW);
+    }
+  }
+
+  /**
+   * Detects breakout by evaluating the price point of an aggregated bar tick against the
+   * established opening range and the current VWAP.
+   *
+   * <p>If a breakout is confirmed, transitions to the next phase {@code PULLBACK}, waiting for
+   * price to pullback and identifies overall market trend indicated by {@code isBullishTrend}. If
+   * the price retraces more than 61.8%, the trend is invalidated and breakout detection starts
+   * again only if price enters opening range.
    *
    * @param tick aggregated bar tick
    */
   private void detectBreakout(RealTimeBarTick tick) {
-    log.debug("Processing aggregated bar tick for {} strategy.", Thread.currentThread().getName());
-
-    Contract contract = null;
+    state = BREAKOUT;
     double close = tick.getClose();
-    double vwap = getVwap();
+    if (close <= PRICE_HIGH.doubleValue() && close >= PRICE_LOW.doubleValue()) {
+      isBreakoutActive = false;
+      return;
+    }
+    // trend invalidated but price still outside opening range
+    if (isBreakoutActive) {
+      return;
+    }
+
+    double vwap = this.vwap.compute();
     if (close > PRICE_HIGH.doubleValue() && close > vwap) {
-      log.info(
-          "Bullish price breakout above VWAP {}, buying call option with strike price of {}.",
-          vwap, ceil(close));
-      contract = createOptionContract(ceil(close), Call.name());
-    } else if (close < PRICE_LOW.doubleValue() && close < vwap) {
-      log.info(
-          "Bearish price breakdown below VWAP {}, buying put option with strike price of {}.",
-          vwap, floor(close));
-      contract = createOptionContract(floor(close), Put.name());
+      log.info("Bullish price breakout above VWAP {}, waiting for price pullback...", vwap);
+      isBreakoutActive = true;
+      isBullishTrend = true;
+      state = PULLBACK;
+      return;
+    }
+
+    if (close < PRICE_LOW.doubleValue() && close < vwap) {
+      log.info("Bearish price breakdown below VWAP {}, waiting for price pullback...", vwap);
+      isBreakoutActive = true;
+      isBullishTrend = false;
+      state = PULLBACK;
+    }
+  }
+
+  /**
+   * Detects price pullback before the market trend resumes to identify potential entry point for
+   * better risk-reward ratio.
+   *
+   * <p>Identifies peak for bullish trend or trough for bearish trend. Once confirmed, marks
+   * Fibonacci retracement levels and transitions to the next phase {@code RETRACEMENT}.
+   *
+   * @param tick aggregated bar tick
+   */
+  private void detectPullback(RealTimeBarTick tick) {
+    RealTimeBarTick pivot = lookbackWindow.get(1);
+    if (isBullishTrend) {
+      if (isTrendReversing(tick, true)) {
+        fib = new FibonacciRetracement(pivot.getHigh(), PRICE_LOW.doubleValue(), true);
+        log.info("Fib retracement levels: 0% - {}, 38.2% - {}, 50% - {}, 61.8% - {}, 100% - {}",
+            pivot.getHigh(), fib.fib382(), fib.fib500(), fib.fib618(), PRICE_LOW.doubleValue());
+        state = RETRACEMENT;
+      }
+    } else {
+      if (isTrendReversing(tick, false)) {
+        fib = new FibonacciRetracement(PRICE_HIGH.doubleValue(), pivot.getLow(), false);
+        log.info("Fib retracement levels: 0% - {}, 38.2% - {}, 50% - {}, 61.8% - {}, 100% - {}",
+            pivot.getLow(), fib.fib382(), fib.fib500(), fib.fib618(), PRICE_HIGH.doubleValue());
+        state = RETRACEMENT;
+      }
+    }
+  }
+
+  /**
+   * Detects price retracement signaling potential trend continuation after a period of pullback.
+   *
+   * <p>Identifies trough for bullish trend or peak for bearish trend. Once confirmed, requests for
+   * option market data snapshot to establish option price and places limit price order.
+   *
+   * @param tick aggregated bar tick
+   */
+  private void detectRetracement(RealTimeBarTick tick) {
+    Contract contract = null;
+    if (isBullishTrend) {
+      if (isTrendReversing(tick, false)) {
+        contract = checkPriceIsInFibZone(tick);
+      }
+    } else {
+      if (isTrendReversing(tick, true)) {
+        contract = checkPriceIsInFibZone(tick);
+      }
     }
 
     if (Objects.nonNull(contract)) {
@@ -157,69 +252,67 @@ public class OpeningRangeBreakoutStrategy extends AbstractStrategy {
   }
 
   /**
-   * Creates and returns a 0DTE option contract.
+   * Evaluates potential trend reversal by identifying peak or trough with the help of
+   * {@code lookbackWindow}, which stores the previous two bar ticks.
    *
-   * @param strike option strike price
-   * @param right  option type (i.e. call or put)
-   * @return {@link Contract} with given price and right
+   * @param tick           aggregated bar tick
+   * @param isBullishTrend {@code true} if the trend is bullish, else {@code false}
+   * @return {@code true} if trend is reversing, else {@code false}
    */
-  private Contract createOptionContract(double strike, String right) {
-    Contract contract = new Contract();
-    contract.symbol("SPY");
-    contract.secType(SecType.OPT);
-    contract.exchange("SMART");
-    contract.currency("USD");
-    contract.lastTradeDateOrContractMonth(LocalDate.now(NY_TIME_ZONE).format(FORMATTER));
-    contract.strike(strike);
-    contract.right(right);
-    contract.multiplier("100");
-    return contract;
+  private boolean isTrendReversing(RealTimeBarTick tick, boolean isBullishTrend) {
+    RealTimeBarTick left = lookbackWindow.get(0);
+    RealTimeBarTick pivot = lookbackWindow.get(1);
+    double leftMidpoint = (left.getOpen() + left.getClose()) / 2;
+    double pivotMidpoint = (pivot.getOpen() + pivot.getClose()) / 2;
+    double currentMidpoint = (tick.getOpen() + tick.getClose()) / 2;
+
+    return isBullishTrend ? ((currentMidpoint < pivotMidpoint) && (pivotMidpoint > leftMidpoint))
+        : ((currentMidpoint > pivotMidpoint) && (pivotMidpoint < leftMidpoint));
   }
 
   /**
-   * Creates and returns a bracket order with limit entry price, a limit take profit and a stop loss
-   * exit.
+   * Checks how much the price retraced back and sets risk factor accordingly. If price retraces
+   * more than 61.8%, invalidates the trend and waits for price to enter opening range again.
    *
-   * @param bidPrice current market bid price
-   * @param askPrice current market ask price
-   * @return {@link List} of {@link Order} with take profit and stop loss attached to parent order
+   * @param tick aggregated bar tick
+   * @return option {@link Contract} if price is within entry zone, else {@code null}
    */
-  private List<Order> createBracketOrder(double bidPrice, double askPrice) {
-    int parentOrderId = IBClient.getNextRequestId();
-    double midPrice = (bidPrice + askPrice) / 2;
-    double limitPrice = Math.floor(midPrice * 100) / 100;
-    double tpLimitPrice = Math.floor((limitPrice * 2) * 100.0) / 100.0;
-    double slLimitPrice = Math.floor((limitPrice * 0.50) * 100.0) / 100.0;
+  @Nullable
+  private Contract checkPriceIsInFibZone(RealTimeBarTick tick) {
+    double price = isBullishTrend ? tick.getLow() : tick.getHigh();
+    double buffer = 0.05;
 
-    Order parent = new Order();
-    parent.orderId(parentOrderId);
-    parent.action(BUY);
-    parent.orderType(LMT);
-    parent.lmtPrice(limitPrice);
-    parent.totalQuantity(ONE);
-    parent.orderRef(Thread.currentThread().getName());
-    parent.transmit(false);
+    boolean trendInvalidated =
+        isBullishTrend ? (price <= fib.fib618() + buffer) : (price >= fib.fib618() - buffer);
+    if (trendInvalidated) {
+      log.info("Price breached Fib level 61.8%, invalidating trend...");
+      state = BREAKOUT;
+      return null;
+    }
 
-    Order takeProfit = new Order();
-    takeProfit.orderId(IBClient.getNextRequestId());
-    takeProfit.parentId(parentOrderId);
-    takeProfit.action(SELL);
-    takeProfit.orderType(LMT);
-    takeProfit.lmtPrice(tpLimitPrice);
-    takeProfit.totalQuantity(ONE);
-    takeProfit.transmit(false);
+    if (isBullishTrend) {
+      if (price <= fib.fib382() + buffer) {
+        log.info("Bullish trend - price entered Fib level 38.2%, setting risk to 50%");
+        risk = 0.5;
+      } else if (price <= fib.fib500() + buffer) {
+        log.info("Bullish trend - price entered Fib level 50%, setting risk to 30%");
+        risk = 0.3;
+      } else {
+        return null;
+      }
+    } else {
+      if (price >= fib.fib382() - buffer) {
+        log.info("Bearish trend - price entered Fib level 38.2%, setting risk to 50%");
+        risk = 0.5;
+      } else if (price >= fib.fib500() - buffer) {
+        log.info("Bearish trend - price entered Fib level 50%, setting risk to 30%");
+        risk = 0.3;
+      } else {
+        return null;
+      }
+    }
 
-    Order stopLoss = new Order();
-    stopLoss.orderId(IBClient.getNextRequestId());
-    stopLoss.parentId(parentOrderId);
-    stopLoss.action(SELL);
-    stopLoss.orderType(STP);
-    stopLoss.auxPrice(slLimitPrice);
-    stopLoss.totalQuantity(ONE);
-    stopLoss.transmit(true);
-
-    log.info("Creating bracket order - limit price: {}, take profit: {}, stop loss: {}", limitPrice,
-        tpLimitPrice, slLimitPrice);
-    return List.of(parent, takeProfit, stopLoss);
+    return isBullishTrend ? createOptionContract(ceil(price), Call.name())
+        : createOptionContract(ceil(price), Put.name());
   }
 }

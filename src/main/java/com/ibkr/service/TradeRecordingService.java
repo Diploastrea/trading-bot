@@ -1,7 +1,7 @@
 package com.ibkr.service;
 
 import static com.ib.client.OrderStatus.Filled;
-import static com.ibkr.strategy.AbstractStrategy.FORMATTER;
+import static com.ibkr.statics.constants.CommonConstants.FORMATTER;
 
 import com.ib.client.protobuf.ContractProto.Contract;
 import com.ib.client.protobuf.OpenOrderProto.OpenOrder;
