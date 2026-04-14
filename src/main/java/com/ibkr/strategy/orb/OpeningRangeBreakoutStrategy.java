@@ -207,20 +207,19 @@ public class OpeningRangeBreakoutStrategy extends AbstractStrategy {
    */
   private void detectPullback(RealTimeBarTick tick) {
     RealTimeBarTick pivot = lookbackWindow.get(1);
-    if (isBullishTrend) {
-      if (isTrendReversing(tick, true)) {
-        fib = new FibonacciRetracement(pivot.getHigh(), PRICE_LOW.doubleValue(), true);
-        log.info("Fib retracement levels: 0% - {}, 38.2% - {}, 50% - {}, 61.8% - {}, 100% - {}",
-            pivot.getHigh(), fib.fib382(), fib.fib500(), fib.fib618(), PRICE_LOW.doubleValue());
-        state = RETRACEMENT;
-      }
-    } else {
-      if (isTrendReversing(tick, false)) {
-        fib = new FibonacciRetracement(PRICE_HIGH.doubleValue(), pivot.getLow(), false);
-        log.info("Fib retracement levels: 0% - {}, 38.2% - {}, 50% - {}, 61.8% - {}, 100% - {}",
-            pivot.getLow(), fib.fib382(), fib.fib500(), fib.fib618(), PRICE_HIGH.doubleValue());
-        state = RETRACEMENT;
-      }
+    if (isBullishTrend && isTrendReversing(tick, true)) {
+      fib = new FibonacciRetracement(pivot.getHigh(), PRICE_LOW.doubleValue(), true);
+      log.info("Fib retracement levels: 0% - {}, 38.2% - {}, 50% - {}, 61.8% - {}, 100% - {}",
+          pivot.getHigh(), fib.fib382(), fib.fib500(), fib.fib618(), PRICE_LOW.doubleValue());
+      state = RETRACEMENT;
+      return;
+    }
+
+    if (!isBullishTrend && isTrendReversing(tick, false)) {
+      fib = new FibonacciRetracement(PRICE_HIGH.doubleValue(), pivot.getLow(), false);
+      log.info("Fib retracement levels: 0% - {}, 38.2% - {}, 50% - {}, 61.8% - {}, 100% - {}",
+          pivot.getLow(), fib.fib382(), fib.fib500(), fib.fib618(), PRICE_HIGH.doubleValue());
+      state = RETRACEMENT;
     }
   }
 
@@ -234,14 +233,9 @@ public class OpeningRangeBreakoutStrategy extends AbstractStrategy {
    */
   private void detectRetracement(RealTimeBarTick tick) {
     Contract contract = null;
-    if (isBullishTrend) {
-      if (isTrendReversing(tick, false)) {
-        contract = checkPriceIsInFibZone(tick);
-      }
-    } else {
-      if (isTrendReversing(tick, true)) {
-        contract = checkPriceIsInFibZone(tick);
-      }
+    if ((isBullishTrend && isTrendReversing(tick, false)) ||
+        (!isBullishTrend && isTrendReversing(tick, true))) {
+      contract = checkPriceIsInFibZone(tick);
     }
 
     if (Objects.nonNull(contract)) {
