@@ -12,6 +12,7 @@ import static com.ibkr.strategy.orb.StrategyState.OPENING_RANGE;
 import static com.ibkr.strategy.orb.StrategyState.PULLBACK;
 import static com.ibkr.strategy.orb.StrategyState.RETRACEMENT;
 import static java.lang.Math.ceil;
+import static java.lang.Math.floor;
 
 import com.ib.client.Contract;
 import com.ib.client.Order;
@@ -307,6 +308,6 @@ public class OpeningRangeBreakoutStrategy extends AbstractStrategy {
     }
 
     return isBullishTrend ? createOptionContract(ceil(price), Call.name())
-        : createOptionContract(ceil(price), Put.name());
+        : createOptionContract(floor(price), Put.name());
   }
 }
